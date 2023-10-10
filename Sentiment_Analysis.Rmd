@@ -1,0 +1,738 @@
+---
+title: Sentiment Analysis on User's Preference on Samsung and Apple Latest Mobile
+  Product (Samsung GalaxyZFold4 and IPhone14) using Twitter Data
+author: "Ayomiposi Adebayo"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  beamer_presentation: default
+  github_document: default
+fig_caption: yes
+fontsize: 8pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+## **OUTLINE**
+
+
+- Introduction
+
+- Data Mining and Cleaning 
+
+- Exploratory Analysis
+
+  + _Consumer Engagement_
+  + _Time Series Analysis_
+  + _Analysis of User's Tweets by Location_
+  + _Sentiment Analysis_
+  
+- Statistical Analysis
+  + _Summary Statistics_
+  + _T-test Analysis_
+
+- Discussion of Results
+
+- Conclusion/Recommendations
+
+
+---
+
+
+## **INTRODUCTION**
+
+- Social media has become a universal tool employed by several businesses for marketing purposes to boost their brand’s image and to remain competitive in the global space (eMarketer, 2014; Shi, Chen, and Chow, 2016). 
+
+- Due to the diversity that exist in different businesses, many consumers tend to have different varying opinion on how they relate with their chosen brands on social media (Cathryn and Stander, 2018).
+
+- The explosion of data in the forms of blogs, social media such as Facebook, twitter have provided customers with a platform to express their views or preferences about a product/service which tends to either influence sales of such product/services negatively or positively (Deepali, Kin, and Stephen, 2015).This can then be used by such brands to improve their brands or products.
+
+
+- The twitter data for both Samsung GalaxyZfold4 and Iphone14 was extracted and mined from Twitter using the **rtweet** package
+
+- The sample size for the raw data generated on tweets related to Iphone14 was 7,355 and 4,442 for the SamsungGalaxyzfold4 tweets
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Set working Directory
+setwd("C:/Users/adeba/Downloads/Project Portfolio")
+
+# Load all required packages for the Analysis
+library(ggplot2)
+library(dplyr)
+library(ggthemes)
+library(readr)
+library(rtweet)
+library(jsonlite)
+library(tidytext)
+library(wordcloud)
+library(wordcloud2)
+library(tidyr)
+library(maps)
+library(httpuv)
+library(readr)
+library(lubridate)
+library(readxl)
+
+##Load the datasets
+sam<-read_csv("samsungzfold.csv")
+app<-read_csv("appleiphone14.csv")
+```
+
+
+---
+
+
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+# Minning Data from twitter using rtweet package and getting an overview of the data(str)
+#library(rtweet)
+#sam<-search_tweets(q="GalaxyZFold4", n=3000,lang= "en", retryonratelimit = TRUE)
+#app<-search_tweets(q="iphone14", n=3000, lang="en", retryonratelimit = TRUE)
+
+#Data Manipulation(cleaning) of Twitter data for both business products
+#Removing duplicates items from the dataset
+sam <- subset(sam, !duplicated(sam$user_id))
+app <- subset(app, !duplicated(app$user_id))
+
+#Distinguishing the original, re-tweets and replies
+#first get the original tweets by removing the replies and retweets
+sam_original <- sam[sam$is_retweet==FALSE, ]#pass all original tweets to a variable sam_original
+sam_original <- subset(sam_original, is.na(sam_original$reply_to_status_id))#remove replies and pass the reminder to the variable
+
+app_original <- app[app$is_retweet==FALSE, ]#pass all original tweets to a variable app_original
+app_original <- subset(app_original, is.na(app_original$reply_to_status_id))#remove replies and pass the reminder to the variable
+
+
+#Extracting the re-tweets & replies for both business products
+sam_retweets <- sam[sam$is_retweet==TRUE,]
+sam_replies <- subset(sam, !is.na(sam$reply_to_status_id))
+
+app_retweets <- app[app$is_retweet==TRUE,]
+app_replies <- subset(app, !is.na(app$reply_to_status_id))
+
+```
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+#We prepared a donut chart to calculate the percentage of original tweets, retweets and replies
+#A data frame containing original,retweets and replies for each product was determined to show the distribution
+#Samsung
+
+sam_df <- data.frame(
+  category=c("Original", "Retweets", "Replies"),
+  count=c(125,4252, 64)
+)
+
+# Add additional columns for the percentages 
+sam_df$fraction = sam_df$count / sum(sam_df$count)
+sam_df$percentage = sam_df$count / sum(sam_df$count) * 100
+sam_df$ymax = cumsum(sam_df$fraction)
+sam_df$ymin = c(0, head(sam_df$ymax, n=-1))
+
+# Rounding the data to two decimal points
+sam_df$percentage <- round(sam_df$percentage, 2)
+
+# Specify what the legend should say
+Type_of_Tweet <- paste(sam_df$category, sam_df$percentage, "%")# defining the legend
+
+#Same for Apple
+app_df <- data.frame(
+  category=c("Original", "Retweets", "Replies"),
+  count=c(1388, 4523, 1443)
+)
+
+app_df$fraction = app_df$count / sum(app_df$count)
+app_df$percentage = app_df$count / sum(app_df$count) * 100
+app_df$ymax = cumsum(app_df$fraction)
+app_df$ymin = c(0, head(app_df$ymax, n=-1))
+
+# Rounding the data to two decimal points
+app_df$percentage <- round(app_df$percentage, 2)
+
+# Specify what the legend should say
+Apple_Type_of_Tweet <- paste(app_df$category, app_df$percentage, "%")
+```
+
+## **Exploratory Analysis**
+
+**_User Engagement Analysis_**
+
+
+```{r, fig.cap= "Donut Chat Showing the Percentage of Original tweets,Replies and Retweets of  Samsung GalaxyZfold4 and Apple Iphone14", echo= FALSE, message=FALSE, warning=FALSE, fig.show='hold', fig.align='center', out.width='49%'}
+# Define custom colors for different tweet categories for Samsung Product
+tweet_colors <- c("#FF0000", "#FFA500", "#800080")
+# Create the first donut chart (Samsung GalaxyZFold4)
+ggplot(sam_df, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=Type_of_Tweet)) +
+  geom_rect() +
+  scale_fill_manual(values = tweet_colors) + # Use the custom colors
+  coord_polar(theta="y") + 
+  xlim(c(2, 4)) +
+  theme_void() +
+  theme(legend.position = "right", legend.text=element_text(size=18), legend.title=element_text(size=18)) +
+  labs(title="Figure 1a: Distribution of GalaxyZFold4 Tweets")+
+  theme(title = element_text(size = 20))
+
+# Define custom colors for different tweet categories for Apple Product
+colors <- c("#800000", "#000080","#FFA500") 
+
+# Create the second donut chart (iPhone 14)
+ggplot(app_df, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=Apple_Type_of_Tweet)) +
+  geom_rect() +
+  scale_fill_manual(values = colors) + # Use the custom colors
+  coord_polar(theta="y") + 
+  xlim(c(2, 4)) +
+  theme_void() +
+  theme(legend.position = "right", legend.text=element_text(size=18), legend.title=element_text(size=18)) +
+  labs(title="Distribution of Iphone14 Tweets", title.size=20) +
+  theme(title = element_text(size = 20))
+
+
+```
+
+
+---
+
+
+_**Analysis of User's Tweets by Location**_
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+#where are these users tweeting from
+#Plot the Distribution of User's Location  against frequency of tweets
+#Changed all empty locations to "NA"
+sam$location[sam$location==""] <- NA #to to transform the empty locations to NA
+app$location[app$location==""] <- NA #to to transform the empty locations to NA
+
+```
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+#The volume  of tweets was plotted against time to check the rate/frequency at which different tweets 
+#on Samsung GalaxyZfold4 and Apple iphone14 are generated per time
+#
+# In order to plot the number of tweets per time, we need to count the number of tweets per time created
+#and since time created indicates tweets created to the last second, it would be impossible to read the data on the plot
+#so we round up to daily using a built in function called 'Lubridate'
+
+library(lubridate) #citation*
+sam$created_at <- as.POSIXct(sam$created_at, format= "%d/%m/%Y %H:%M:%S", tz="GMT")
+app$created_at <- as.POSIXct(app$created_at, format= "%d/%m/%Y %H:%M:%S", tz="GMT")
+
+#The volume  of tweets was plotted against time to check the rate/frequency at which different tweets 
+#on Samsung GalaxyZfold4 and Iphone 14 are generated per time
+#plot time was set at 60 minutes interval
+#creating new column using "mutate function" to round the time to day
+#Plotting the generated tweets for Samsung GalaxyZfold4 and Iphone 14 per hour
+```
+```{r, fig.cap= "Plot Showing Users Tweets for Galaxyfold4 and Apple iphone14 by Location", echo= FALSE, message=FALSE, warning=FALSE, fig.show='hold', fig.align='center', out.width='49%' }
+app_rt <- app %>% mutate(location = 
+                           recode(location, "日本" = "NA", "USA" ="United States"))
+#FOR APPLE
+app_rt %>%
+  count(location, sort = TRUE) %>%
+  mutate(location = reorder(location,n)) %>%
+  na.omit() %>%
+  filter(location!="he/him \u2642\ufe0f")%>%
+  head(10) %>% 
+  ggplot(aes(x = location,y = n)) +
+  geom_col(fill = "orange") +
+  coord_flip() +
+  labs(x = "Top Locations",
+       y = "Frequency",
+       title = "Figure 4a: Location of users tweeting about #Iphone14") + 
+  theme(axis.text = element_text(size = 16, color = "black"), 
+        axis.title = element_text(size = 16, color = "black"),
+        title = element_text(size = 18))
+
+#Samsung
+sam %>%
+  count(location, sort = TRUE) %>%
+  mutate(location = reorder(location,n)) %>% #to make sure the locations are ordered according to frequency
+  na.omit() %>%
+  filter(location!="Planet C-53")%>%
+  head(10) %>%
+  ggplot(aes(x = location,y = n)) +
+  geom_col(fill = "blue") +
+  coord_flip() +
+  labs(x = "Top Locations",
+       y = "Frequency",
+       title = "Figure 4b: Location of users tweeting about #SamsungGalaxyZfold4") + 
+  theme(axis.text = element_text(size = 16, color = "black"), 
+        axis.title = element_text(size = 16, color = "black"),
+        title = element_text(size = 18))
+```
+
+
+---
+
+
+_**User's Engagement and Analysis of Tweets by Location (Interpretation)**_
+
+- The User Engagement analysis was explored to understand how users interact and engage on different topics, brands and products on Social media such as twitter
+
+- Figure 1a shows a great level of retweet engagement  for the tweets posts generated for SamsungGalaxyZFold4 tweets but less replies  compared to Figure 1b where a uniform level of engagement was observed for the tweets, re-tweets and replies generated for Iphone14 
+
+- Results from further analysis on User engagement showed that most of the users retweeted posts on SamsungGalaxyZfold4 because  a raffle draw was conducted at the period
+
+- In addition, Figure 2a shows that the number of users tweeting about the new "Iphone14" was higher in Nigeria and United States while Figure 3b indicates that conversations on the new product "Samsung GalaxyZfold4" was observed to be more prominent in France and United States
+
+- This findings suggest that a higher proportion of Iphone users or Iphone enthusiast might be from these locations. Also, United States was observed to have tweet conversations activity for both products.
+- Another possible reason for the uneven data set is that people in a particular geolocation tend to tweet more about a particular product compared to the other 
+
+---
+
+
+_**Time Series Analysis**_
+
+
+```{r, fig.cap= "Plot Showing Time Series Analysis for Galaxyfold4 and  iphone14 ",results='hide', message=FALSE,warning=FALSE,error=FALSE}
+sam_df_time_stack<-sam%>%select(created_at,text)
+app_df_time_stack<-app%>%select(created_at,text)
+sam_subject<-sam_df_time_stack%>%mutate(subject="GalaxyZfold4")
+app_subject<-app_df_time_stack%>%mutate(subject="iphone14")
+
+all_tweets<- rbind.data.frame(sam_subject,app_subject)
+all_tweets
+all_tweets%>%
+  mutate(hour_created = floor_date(all_tweets$created_at,"hour"))%>%
+  group_by(subject,hour_created)%>% summarise(count=n())%>%
+  
+  ggplot(aes(x=hour_created))+
+  geom_line(aes(y=count, colour = subject), size = 0.85)+
+  theme_bw()+
+  theme(plot.title = element_text(face = "bold"),
+        legend.title = element_blank())+
+  labs(x="Time(Hrs)", y="Tweets",
+       caption="Source:Data Collected from Twitter's REST API via rtweet",
+       subtitle="Tweet count generated per hour")
+#Source:(Giannetti,2017)
+
+
+```
+
+
+---
+
+
+_**Time Series Analysis(Interpretation) **_
+
+ - This chart describes the frequency of tweets gotten for these products over time. this analysis was done to determine the interest level of the products by Users
+ 
+ - Fig.3 shows that the period for the tweets generated for Samsung GalaxyZfold4 within the 60 minutes interval was observed to have started from November 19th and engagement continued which gradually increased on 22nd of November and it peak b November 23rd, engagement on the tweet continued and  gradually reduced  from 25th of November down to 27th of November
+
+ - Fig.3 shows that the  period for the tweets generated for Iphone14 within the 60 minutes interval 
+was observed to have started from November 19th  with more engagement per time throughout. 
+
+- The peak period was observed on 27th of November into 28th of November however, more people tweeted about the product on the 21st of November because there's an even spread on this day
+
+ - From the time series plot for both products, the Apple product Iphone14 has more engagements than Samsung product GalaxyZfold4.Twitter users are engaging more on the Apple products compared to the samsung products
+ 
+ - This could imply that there are more users of the Apple product Iphone14 than that of the Samsung users SamsungGalaxyZfold4
+
+---
+
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+#DATA CLEANING
+
+#The Data would be further cleaned up to properly analyse the text.
+#First, we must remove the urls in the text in order to properly analyse the most common words 
+#and also remove http elements manually
+
+sam$stripped_text <- gsub("http.*","",  sam$text)
+sam$stripped_text <- gsub("https.*","", sam$stripped_text)
+sam$stripped_text <- gsub("amp","", sam$stripped_text)
+
+
+app$stripped_text <- gsub("http.*","",  app$text)
+app$stripped_text <- gsub("https.*","", app$stripped_text)
+app$stripped_text <- gsub("amp","", app$stripped_text)
+
+# We need to create unique words and this means further cleaning the text by removing words that are capitalized. 
+# R is case sensitive, hence words that are capitalized have different meaning with lowercase words 
+# We need to need to remove punctuation marks from our text
+#
+# The unnest_tokens() function in the tidytext package helps to  
+# clean up  text. The following items will be cleaned from the text
+#
+# Unique id associated with the tweet: will be added for each occurrence of the word
+#Our cleaned text will be stored in samsung_2 and apple_2 respectively
+```
+
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+samsung_2 <- sam%>%
+  select(stripped_text) %>% 
+  mutate(tweetnumber = row_number()) %>% # create new variable denoting the tweet number
+  unnest_tokens(word, stripped_text)
+
+apple_2 <- app %>%
+  select(stripped_text) %>% 
+  mutate(tweetnumber = row_number()) %>% # create new variable denoting the tweet number
+  unnest_tokens(word, stripped_text)
+
+#Load stop words from tidytext package
+
+data("stop_words")
+
+# view first 6 words
+#head(stop_words)
+#nrow(samsung_2)
+#nrow(apple_2)
+
+# Remove stop words from your list of words. Stop words are ones that are not useful
+#These are words to join words. We need to remove them in order to analyse the text properly
+samsung_tweet_words <- samsung_2 %>%
+  anti_join(stop_words) # return all rows from samsung where there are not matching values in stop_words
+
+apple_tweet_words <- apple_2 %>%
+  anti_join(stop_words) 
+
+#Let's define words that we no longer want in the list
+my_stop_words_samsung <- data.frame(word = c("steps","concours","follow","godofwarragnorok"))
+my_stop_words_apple <- data.frame(word = c("1", "5", "steam","enter","follow"))
+#
+#Now remove other stopwords not useful in the list of words
+samsung_tweet_words_2 <- samsung_tweet_words %>%
+  anti_join(my_stop_words_samsung) 
+apple_tweet_words_2 <- apple_tweet_words %>%
+  anti_join(my_stop_words_apple)
+
+```
+
+
+## **Sentiment analysis**
+_**Word Cloud**_
+```{r, fig.cap= "Word Cloud for Samsung Galaxyfold4 and Apple iphone14", echo= FALSE, message=FALSE, warning=FALSE, fig.show='hold', fig.align='center', out.width='50%'}
+#The word cloud is used to count and sort each words 
+# The frequency of each word would be determined as
+# the count of each word / the total count
+#SAMSUNG
+samsung_tweet_words_3 <- samsung_tweet_words_2 %>%
+  count(word, sort = TRUE) %>% 
+  mutate(freq = n / sum(n))
+
+with(samsung_tweet_words_3, 
+     wordcloud(word, freq, 
+               min.freq = 1, 
+               max.words = 50,
+               random.order = FALSE, 
+               colors = brewer.pal(8, "Dark2"), 
+               scale = c(12, 0.1)))
+
+  
+  #APPLE
+apple_tweet_words_3 <- apple_tweet_words_2 %>%
+  count(word, sort = TRUE) %>% 
+  mutate(freq = n / sum(n))
+
+with(apple_tweet_words_3, 
+     wordcloud(word, freq, 
+               min.freq = 1, 
+               max.words = 50,
+               random.order = FALSE, 
+               colors = brewer.pal(1, "Set1"), 
+               scale = c(12, 0.1)))
+```
+
+---
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+# To perform sentiment analysis, R has an inbuilt function in the tidytext package that can evaluate the emotion expressed in a text
+#the bing lexicon and get_sentiment function is among others that offer such word to emotion evaluation, others are AFINN, NRC.
+# 
+#
+# For this purpose the  "bing" lexicon is used to classify words to an emotional value
+# Words are classified into positive or negative
+
+#Join sentiment classification to the tweet words
+#SAMSUNG
+samsung_bing_word_counts <- samsung_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) 
+
+#APPLE
+apple_bing_word_counts <- apple_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) 
+```
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+# Finally, plot top words, grouped by positive vs. negative sentiment. 
+#SAMSUNG
+samsung_bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  theme_bw()+
+  facet_wrap(sentiment~., scales = "free_y") +
+  labs(title = "Tweets containing Positive and Negative words on Samsung GalaxyZfold4",
+       y = "Sentiment",
+       x = NULL) +
+  theme(axis.text = element_text(size = 8, color = "black"), 
+        axis.title = element_text(size = 14, color = "black"),
+        title = element_text(size = 15))
+
+#APPLE
+apple_bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  theme_bw()+
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(title = "Tweets containing Positive and Negative words on Apple iphone14",
+       y = "Sentiment",
+       x = NULL) +
+  theme(axis.text = element_text(size = 14, color = "black"), 
+        axis.title = element_text(size = 14, color = "black"),
+        title = element_text(size = 15))
+```
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+#Calculate sentiment score
+#Count the positive and negative words there are in each tweet for both brand
+#
+# associate sentiment scores to each tweet
+samsung_sentiment_score <- samsung_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(tweetnumber, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>% # negative and positive sentiment in separate columns
+  mutate(score = positive - negative) # score = net sentiment (positive - negative)
+head(samsung_sentiment_score)
+
+apple_sentiment_score <- apple_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(tweetnumber, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>% # negative and positive sentiment in separate columns
+  mutate(score = positive - negative) # score = net sentiment (positive - negative)
+
+#Join sentiment classification to the tweet words
+#SAMSUNG
+samsung_bing_word_counts <- samsung_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) 
+
+#APPLE
+apple_bing_word_counts <- apple_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  mutate(word = reorder(word, n))
+
+# Add a variable to indicate the topic
+#
+samsung_sentiment_score <- samsung_sentiment_score %>% 
+  mutate(product = "Samsung Tweets")
+
+apple_sentiment_score <- apple_sentiment_score %>% 
+  mutate(product = "apple Tweets")
+
+# Tabulate the scores
+#
+samsung_sentiment_score %>% count(score)
+apple_sentiment_score %>% count(score)
+
+# Let's work out the mean score 
+# We'll include it as a line and as a numerical value to our plot
+#
+samsung_sentiment_means <- samsung_sentiment_score %>% 
+  summarize(mean_score = mean(score)) 
+
+apple_sentiment_means <- apple_sentiment_score %>% 
+  summarize(mean_score = mean(score)) 
+
+
+
+```
+
+**Sentiment Analysis of Tweets for both Samsung Galaxyfold4 and Iphone14**
+```{r, fig.cap= "Tweets containing Positive and Negative words for both Samsung Galaxyfold4 and Iphone14", echo= FALSE, message=FALSE, warning=FALSE, fig.show='hold', fig.align='center', out.width='50%'}
+samsung_bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  theme_bw()+
+  facet_wrap(sentiment~., scales = "free_y") +
+  labs(title = "Tweets containing Positive and Negative words on #Samsung",
+       y = "Sentiment",
+       x = NULL) +
+  theme(axis.text = element_text(size = 8, color = "black"), 
+        axis.title = element_text(size = 14, color = "black"),
+        title = element_text(size = 15))
+#APPLE
+apple_bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  theme_bw()+
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(title = "Tweets containing Positive and Negative words on #Apple",
+       y = "Sentiment",
+       x = NULL) +
+  theme(axis.text = element_text(size = 14, color = "black"), 
+        axis.title = element_text(size = 14, color = "black"),
+        title = element_text(size = 15))
+```
+
+
+---
+
+
+## **Sentiment Analysis(Interpretation)**
+
+- Sentiment Analysis is the process of examining the opinions, views and sentiments of users or consumers across social media platforms on different business topics, products, or services (Hu and Liu, 2004).
+
+
+- This presents the opinion or views of people on a particular product or topic based on the frequency of positive and negative words gotten from the sentiment analysis
+
+- Figure 5 shows that people used more of positive words while engaging these two latest products on Twitter
+
+- Tweets generated on SamsungGalaxyZfold4 had the highest level of positive sentiment as only a few negative words were observed from the tweets. In the same vein, Iphone14 tweets also had positive tweets on "winning or  being lucky" but also had negative words centered on "losing/delay the competition"
+
+- The sentiment analysis of users was highly dependent on the activities trending in twitter at the period of this analysis
+
+
+---
+
+
+**NORMALITY**
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+#T TEST
+#lets check the data distribution for normality and spread
+#Perform t-test on the dataset. Lets's find out the variance of the dataset
+#to test if the t-test assumptions are in place. These assumptions are:
+#1.The dependent variable must be continous or ordinal- The data has been converted to one with an order with intervals 
+#2. Sample size must be > 30
+#3. Sample data randomly selected and must be representative of the total population
+#4.Variance of the 2groups must be approximately equal
+#5. The data results in a normal bell shaped distribution
+#find the variance of each group
+#Analyse both product together
+app_sam_word_counts <- rbind(samsung_sentiment_score, 
+                             apple_sentiment_score) # rbind binds the rows of data frames
+
+
+app_sam_word_counts_var <-app_sam_word_counts%>% group_by(product) %>%
+  summarise(sample_sizes = n(),
+            variances = var(score))
+app_sam_word_counts_var
+
+#the variance for iphone 14 is 2.03 with a sample size of 3649 while 
+#galaxyzfold4 has a variance of 0.192 with a sample size of 4293.
+```
+
+```{r, fig.cap= "Comparison of Samsung GalaxyZfold4 and Apple iphone14", echo= FALSE, message=FALSE, warning=FALSE, fig.show='hold', fig.align='center', out.width='75%'}
+#Lets plot the histogram
+ggplot(app_sam_word_counts, aes(x = score, fill = product)) + # Fill the histogram bars with a different colour
+  geom_histogram(bins=20,aes(y =..density..)) +
+  geom_density(alpha=0.6, bw=1)+
+  labs(x = "score of tweets",
+       title= "Comparison of iphone14 and galaxyfold4") +
+  theme_bw()+
+  facet_grid(product ~ .)
+```
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+#To test further for normality, the data will be subjected to a Shapiro-Wilk test, the null hypothesis is that
+#the data is distributed normally. The null hypothesis will be rejected if the p-value is less or equal to 0.05
+iphone14_test<-app_sam_word_counts%>%filter(product=="apple Tweets")
+galaxyfold_df_test<-app_sam_word_counts%>%filter(product=="Samsung Tweets")
+
+with(iphone14_test,shapiro.test(score))
+with(galaxyfold_df_test,shapiro.test(score))
+```
+
+---
+
+## **Statistical Analysis**
+**T-TEST ANALYSIS**
+
+- T test analysis is done to check if there exist an underlying difference of the mean sentiment scores between iphone14 and galaxyzfold4
+
+
+- An unpaired statistical t-test analysis will be the most appropriate statistical test because we have 2 independent groups
+
+
+- The choice of the statistical t-test is dependent on  if the sentiment scores are normally distributed and has equal variances
+
+- Figure 6 revealed that both the sentiment scores for the products are not normally distributed as the  Iphone14 sentiment scores are negatively skewed suggesting more negative opinions compared to the Samsung GalaxyZfold4 while sentiment scores for Samsung Galaxyzfold4 were concentrated around the mean (2.0) indicating more positive tweets
+
+- This was confirmed by Shapiro-wilk test used to check for normality of the distribution , the p-value was determined as <2.2e-16. The null hypothesis that distribution is normal is rejected
+
+
+- Therefore, the non-parametric t-test (Mann-Whitney Wilcoxon test) will be used for this statistical analysis
+
+
+- The  p-value determined by the Mann-Whitney Wilcoxon test `r wilcox.test(score ~ product, data = app_sam_word_counts)` is less than 0.05, hence we reject the null hypothesis. The findings reveals that there is a difference in the preference of Users for both SamsungGalaxyZfold4 and Iphone14
+
+```{r, include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+
+#Calculate sentiment score
+#Count the positive and negative words there are in each tweet for both brand
+#
+# associate sentiment scores to each tweet
+samsung_sentiment_score <- samsung_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(tweetnumber, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>% # negative and positive sentiment in separate columns
+  mutate(score = positive - negative) # score = net sentiment (positive - negative)
+
+
+apple_sentiment_score <- apple_tweet_words_2 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(tweetnumber, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>% # negative and positive sentiment in separate columns
+  mutate(score = positive - negative) # score = net sentiment (positive - negative)
+
+
+
+```
+
+
+
+```{r,include=FALSE,eval=TRUE,message=FALSE,warning=FALSE}
+wilcox.test(score ~ product, data = app_sam_word_counts)
+```
+
+
+---
+
+
+## **Key Insights and Strategic Suggestions**
+
+- **User Interactions** vary widely on different topics/products on social media within a particular period of time, hence the sentiment analysis would be determined by the nature of engagement or activity on twitter at the point at which the data was extracted.
+
+- Based on the statistical analysis,there exists a difference in User's preference for both products. Users had more positive opinion for galaxyzfold4, Hence the observed number of retweets indicating **user engagement**
+
+- This study  revealed that the twitter engagement was greatly determined by the **promotional messages** trending on twitter at the period at which the data was extracted.
+
+- The companies can leverage more on the **advertisement potentials** of  the social media space to promote their new offerings by engaging more through flash messages, branding, visibility etc
+
+
+## **Project Limitation**
+
+- It must be noted that the following limited the robust analysis conducted on the two business products:
+
+a. Inadequacy in the time in which the data was gathered and the difference in size of data
+
+b. Social media data is not representative of  the consumer population.
+
+c. Unavailability of information in the tweets about specific functionality of the products
+
+d. Representation of opinion not guaranteed because of promotional activity which swayed opinion in favour of one brand.
+
+
+---
+
