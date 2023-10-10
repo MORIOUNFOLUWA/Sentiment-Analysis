@@ -6,11 +6,6 @@ TITLE: Sentiment Analysis on User's Preference on Samsung and Apple Latest Mobil
 AUTHOR: "Ayomiposi Adebayo"
 
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-```
-
-
 ## **OUTLINE**
 
 
